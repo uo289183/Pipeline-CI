@@ -1,0 +1,64 @@
+name: Java CI/CD Pipeline  # Nombre descriptivo del workflow.
+
+on:      # Se especifican los eventos que activarán el pipeline.
+  push:    # Se ejecuta´ra cuando se haga un push a la rama main.
+    branches:  # Se ejecutará cuando se abra un pull request que apunte a la rama main.
+      - main  # Se ejecuta en push a la rama main
+  pull_request:
+    branches:
+      - main  # También en pull requests hacia main
+
+jobs:    # Define las tareas a ejecutar en el pipeline.
+  build:  # Nombre del primer job (proceso de construcción).
+    runs-on: ubuntu-latest  # Especifica el sistema operativo donde se ejecutará el job.
+
+    steps:    # Lista de acciones específicas dentro del job.
+    # 1. Chequea el código
+    - name: Checkout Code  # Nombre descriptivo del paso.
+      uses: actions/checkout@v3  # Clonar el código fuente del repositorio.
+
+    # 2. Configura JDK
+    - name: Set up JDK 17    # Nombre descriptivo del paso.
+      uses: actions/setup-java@v3  # Acción predefinida para instalar un JDK.
+      with:
+        java-version: '17'  # Cambiar a la versión que necesites
+        distribution: 'temurin'  # Distribución de OpenJDK.
+
+    # 3. Instala dependencias y compila
+    - name: Build with Maven
+      run: mvn clean install  # Se usa para compilar y verificar que el proyecto este libre de errores.
+
+    # 4. Corre los tests definidos en el proyceto usando MAVEN.
+    - name: Run Tests
+      run: mvn test  # Ejecuta los tests.
+
+  deploy:      # Define otro job llamado Deploy.
+    needs: build  # Depende del job build. Solo se ejecuta si el job Build ha finalizado con éxito.
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'  # Solo en la rama principal
+
+    steps:
+    # 1. Chequea el código
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    # 2. Configura JDK
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    # 3. Empaqueta la aplicación en un archivo .jar
+    - name: Package Application
+      run: mvn package
+
+    # 4. Despliega (ejemplo con SCP)
+    - name: Deploy to Server
+      env:    # Define variables de entorno.
+        SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      run: |
+        echo "${SSH_PRIVATE_KEY}" > private_key
+        chmod 600 private_key
+        scp -i private_key target/*.jar user@yourserver:/path/to/deploy
+        ssh -i private_key user@yourserver "bash /path/to/deploy/start_server.sh"
